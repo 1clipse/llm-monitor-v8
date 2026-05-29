@@ -1,0 +1,19 @@
+[
+  {
+    "time": "2026-05-29T00:00:00Z",
+    "relay": "mock",
+    "prompt": "Explain LLM monitoring",
+    "text": "Mock historical response used for local dashboard validation.",
+    "analysis": {
+      "risk_label": "LOW",
+      "risk_score": 0.12,
+      "drift_score": 0.03,
+      "mixed_model": false,
+      "model_probabilities": {
+        "gpt_like": 0.34,
+        "claude_like": 0.33,
+        "local_or_mixed": 0.33
+      }
+    }
+  }
+]

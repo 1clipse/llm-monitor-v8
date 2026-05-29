@@ -1,0 +1,26 @@
+{
+  "relays": [
+    {
+      "name": "mock",
+      "type": "mock",
+      "url": null,
+      "api_key": null,
+      "api_key_env": null,
+      "model": "mock-monitor-v8"
+    },
+    {
+      "name": "example-openai-compatible",
+      "type": "openai_compatible",
+      "url": "https://api.example.com/v1/chat/completions",
+      "api_key_env": "EXAMPLE_API_KEY",
+      "model": "example-model"
+    },
+    {
+      "name": "aigokey.cc",
+      "type": "openai_compatible",
+      "url": "https://llm.aigokey.cc",
+      "api_key": "sk-293a1549af8bd87988d049c9eea47bee04a3d879553071fa6a29bee6c81ae3de",
+      "model": "gpt-5.5"
+    }
+  ]
+}
