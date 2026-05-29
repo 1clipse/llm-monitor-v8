@@ -1,118 +1,118 @@
 # LLM Monitor v8
 
-**Author:** Kimziyi
+**作者:** Kimziyi
 
-Industrial local-first LLM monitoring dashboard with FastAPI, React, WebSocket live updates, Prometheus metrics, SQLite/PostgreSQL-compatible storage, mixed-model detection, drift analysis, and risk scoring.
+工业级本地优先的 LLM 监控面板，基于 FastAPI + React + WebSocket 实时更新 + Prometheus 指标 + SQLite/PostgreSQL 双存储，支持混合模型检测、漂移分析和风险评分。
 
-## Features
+## 功能特性
 
-- FastAPI backend with `/ask`, `/ingest`, `/logs`, `/stats`, `/health`, `/metrics`
-- WebSocket stream at `/ws/logs`
-- Prometheus metrics via `prometheus-client`
-- SQLite by default; PostgreSQL can be enabled with `DATABASE_URL`
-- Multi-relay client with a built-in mock relay and OpenAI-compatible relay support
-- Lightweight local embedding features, IsolationForest/SVM anomaly checks, KMeans-style model probability map, drift scoring, risk labels
-- React + Vite dashboard with live logs, risk curve, drift curve, model probability map
-- Docker Compose one-command deployment
-- Windows scripts that keep Python venv and npm dependencies under this project directory
+- FastAPI 后端，提供 `/ask`、`/ingest`、`/logs`、`/stats`、`/health`、`/metrics` 接口
+- WebSocket 实时推送 `/ws/logs`
+- 通过 `prometheus-client` 暴露 Prometheus 指标
+- 默认 SQLite 存储，可通过 `DATABASE_URL` 切换至 PostgreSQL
+- 多中继客户端，内置 mock 中继和 OpenAI 兼容中继支持
+- 轻量级本地向量特征提取、IsolationForest/SVM 异常检测、KMeans 风格模型概率图、漂移评分、风险标签
+- React + Vite 面板，包含实时日志、风险曲线、漂移曲线、模型概率图
+- Docker Compose 一键部署
+- Windows 脚本，Python venv 和 npm 依赖均放在项目目录内
 
-## Recommended simple use
+## 推荐用法
 
-This project is intended to run quietly in the background while you use Claude Code normally through cc-switch.
+本项目设计为你正常使用 Claude Code（通过 cc-switch）时在后台静默运行。
 
-Run only these two commands:
+只需在两个 PowerShell 窗口中分别运行：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8
 .\scripts\run-dev.ps1
 ```
 
-Then open a second PowerShell:
+第二个 PowerShell：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8
 .\scripts\watch-claude-logs.ps1
 ```
 
-After that, use Claude Code normally. Open the simple dashboard at:
+之后正常使用 Claude Code 即可。打开面板：
 
 ```text
 http://localhost:3000
 ```
 
-The monitor only reads local Claude Code JSONL logs and sends already-generated assistant replies to the local `/ingest` endpoint. It does not call models, relays, OpenAI, Claude, or cc-switch APIs. Monitoring adds zero model API cost.
+监控器仅读取本地 Claude Code JSONL 日志，将已生成的助手回复发送到本地 `/ingest` 接口。它不会调用任何模型、中继、OpenAI、Claude 或 cc-switch API。监控过程零模型 API 费用。
 
-## Directory
+## 目录结构
 
 ```text
-backend/      FastAPI service
-frontend/     React dashboard
-data/         local SQLite db, relay config, uploaded files
-scripts/      Windows setup/run scripts
+backend/      FastAPI 服务端
+frontend/     React 面板
+data/         本地 SQLite 数据库、中继配置、上传文件
+scripts/      Windows 安装/运行脚本
 ```
 
-## Local setup on Windows
+## Windows 本地安装
 
-From `D:\LLMtext\llm-monitor-v8`:
+在 `D:\LLMtext\llm-monitor-v8` 下执行：
 
 ```powershell
 .\scripts\setup.ps1
 .\scripts\run-dev.ps1
 ```
 
-The setup script creates:
+安装脚本会创建：
 
 - `backend/.venv`
 - `frontend/node_modules`
 
-Both stay inside `D:\LLMtext\llm-monitor-v8`.
+两者均在 `D:\LLMtext\llm-monitor-v8` 目录内。
 
-## Manual development commands
+## 手动开发命令
 
-Backend:
+后端：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8\backend
 .\.venv\Scripts\python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Frontend:
+前端：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8\frontend
 npm run dev
 ```
 
-Open:
+打开：
 
-- Dashboard: http://localhost:3000
-- API docs: http://localhost:8000/docs
-- Metrics: http://localhost:8000/metrics
+- 面板: http://localhost:3000
+- API 文档: http://localhost:8000/docs
+- 指标: http://localhost:8000/metrics
 
-## Zero-cost realtime monitoring mode
+## 零成本实时监控模式
 
-Use `POST /ingest` when you want this system to monitor model calls made by your own program without adding any paid API calls.
+如果你想用自己的程序监控模型调用，且不希望产生任何额外的付费 API 调用，请使用 `POST /ingest`。
 
-Flow:
+流程：
 
 ```text
-your app calls your model normally
+你的应用正常调用模型
 ↓
-your app receives the model response
+你的应用收到模型回复
 ↓
-your app posts prompt + response text to http://localhost:8000/ingest
+你的应用将 prompt + 回复文本 POST 到 http://localhost:8000/ingest
 ↓
-LLM Monitor v8 analyzes locally and updates the dashboard in realtime
+LLM Monitor v8 在本地分析并实时更新面板
 ```
 
-`/ingest` never calls a model, relay, OpenAI, Claude, or any paid API. It only analyzes text you already received.
+`/ingest` 绝不调用任何模型、中继、OpenAI、Claude 或付费 API，仅分析你已经收到的文本。
 
-Python example:
+Python 示例：
 
 ```python
 import requests
 
-# after your normal model call finishes:
+# 正常模型调用完成后：
 requests.post("http://localhost:8000/ingest", json={
     "relay": "my-current-relay",
     "model": "gpt-4o-mini",
@@ -122,7 +122,7 @@ requests.post("http://localhost:8000/ingest", json={
 })
 ```
 
-PowerShell example:
+PowerShell 示例：
 
 ```powershell
 Invoke-RestMethod http://localhost:8000/ingest `
@@ -131,32 +131,32 @@ Invoke-RestMethod http://localhost:8000/ingest `
   -Body '{"relay":"my-relay","model":"gpt-4o-mini","prompt":"你好","text":"模型已经返回的内容"}'
 ```
 
-Cost boundary:
+费用边界：
 
-- `/ingest`: zero model API cost; local analysis only.
-- `/ask`: active test call; it may call the selected relay and can cost money if that relay is paid.
-- `mock`: local fake relay; no external call and no cost.
+- `/ingest`：零模型 API 费用，仅本地分析。
+- `/ask`：主动测试调用，可能会调用选定的中继，如果该中继是付费的则会产生费用。
+- `mock`：本地假中继，无外部调用，零费用。
 
-## API smoke test
+## API 冒烟测试
 
 ```powershell
 Invoke-RestMethod http://localhost:8000/health
-Invoke-RestMethod http://localhost:8000/ask -Method Post -ContentType "application/json" -Body '{"prompt":"Test the monitor","relay":"mock"}'
+Invoke-RestMethod http://localhost:8000/ask -Method Post -ContentType "application/json" -Body '{"prompt":"测试监控器","relay":"mock"}'
 Invoke-RestMethod http://localhost:8000/logs
 ```
 
-## Docker
+## Docker 部署
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8
 docker compose up --build
 ```
 
-Then open http://localhost:3000.
+然后打开 http://localhost:3000。
 
-## Relay configuration
+## 中继配置
 
-Edit `data/relays.json` to add OpenAI-compatible relays:
+编辑 `data/relays.json` 添加 OpenAI 兼容中继：
 
 ```json
 {
@@ -168,38 +168,38 @@ Edit `data/relays.json` to add OpenAI-compatible relays:
 }
 ```
 
-Set the matching environment variable in `.env` or your shell.
+在 `.env` 或终端环境变量中设置对应的 API Key。
 
-## cc-switch / Claude Code realtime watcher
+## cc-switch / Claude Code 实时监控
 
-For this Windows setup, the recommended zero-cost monitoring mode is the Claude Code JSONL watcher.
+在此 Windows 环境下，推荐使用零成本的 Claude Code JSONL 监控模式。
 
-Why: `cc-switch` stores request metadata in `C:\Users\Knightz\.cc-switch\cc-switch.db`, but the actual assistant reply text is available in Claude Code session logs under `C:\Users\Knightz\.claude\projects`. The watcher reads those local JSONL files and posts only already-generated assistant replies to `/ingest`.
+原理：`cc-switch` 将请求元数据存储在 `C:\Users\Knightz\.cc-switch\cc-switch.db`，但实际的助手回复文本保存在 `C:\Users\Knightz\.claude\projects` 下的 Claude Code 会话日志中。监控器读取这些本地 JSONL 文件，仅将已生成的助手回复 POST 到 `/ingest`。
 
-Run order:
+运行顺序：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8
 .\scripts\run-dev.ps1
 ```
 
-Then open another PowerShell:
+然后打开另一个 PowerShell：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8
 .\scripts\watch-claude-logs.ps1
 ```
 
-Then continue using Claude Code / cc-switch normally. New assistant text replies will be analyzed and shown on the dashboard.
+之后正常使用 Claude Code / cc-switch 即可。新的助手回复文本将被分析并显示在面板上。
 
-Cost guarantee:
+费用保证：
 
-- The watcher only reads local `*.jsonl` files.
-- The watcher only posts already-generated reply text to `http://127.0.0.1:8000/ingest`.
-- It never calls cc-switch, a relay, OpenAI, Claude, or any paid model API.
-- Monitoring adds no model API cost.
+- 监控器仅读取本地 `*.jsonl` 文件。
+- 监控器仅将已生成的回复文本 POST 到 `http://127.0.0.1:8000/ingest`。
+- 绝不调用 cc-switch、任何中继、OpenAI、Claude 或任何付费模型 API。
+- 监控过程零模型 API 费用。
 
-Watcher options:
+监控器参数：
 
 ```powershell
 .\scripts\watch-claude-logs.ps1 `
@@ -208,15 +208,15 @@ Watcher options:
   -PollSeconds 2
 ```
 
-## cc-connect hook integration
+## cc-connect 钩子集成
 
-Your `cc-connect config example` shows support for HTTP hooks. To monitor cc-connect replies in realtime, edit:
+`cc-connect config example` 支持 HTTP 钩子。要实时监控 cc-connect 回复，编辑：
 
 ```text
 C:\Users\Knightz\.cc-connect\config.toml
 ```
 
-Add this block at top-level, outside any `[[projects]]` block:
+在顶层（任意 `[[projects]]` 块之外）添加以下配置：
 
 ```toml
 [[hooks]]
@@ -227,17 +227,17 @@ async = true
 timeout = 5
 ```
 
-Then restart cc-connect:
+然后重启 cc-connect：
 
 ```powershell
 cc-connect daemon restart
 ```
 
-If you run cc-connect in the foreground, stop it and start it again.
+如果你以前台方式运行 cc-connect，请先停止再重新启动。
 
-This hook sends completed cc-connect replies to LLM Monitor. LLM Monitor only analyzes the received text locally. It does not call any model API.
+此钩子将 cc-connect 完成的回复发送到 LLM Monitor。LLM Monitor 仅在本地分析收到的文本，不调用任何模型 API。
 
-Manual adapter test:
+手动适配器测试：
 
 ```powershell
 Invoke-RestMethod http://localhost:8000/integrations/cc-connect `
@@ -246,21 +246,21 @@ Invoke-RestMethod http://localhost:8000/integrations/cc-connect `
   -Body '{"event":"message.sent","message":{"text":"这是 cc-connect 发出的模型回复"},"project":"my-backend"}'
 ```
 
-## Storage
+## 存储
 
-Default local database:
+默认本地数据库：
 
 ```text
 data/llm_monitor.db
 ```
 
-To use PostgreSQL, set `DATABASE_URL`, for example:
+使用 PostgreSQL 时，设置 `DATABASE_URL`，例如：
 
 ```env
 DATABASE_URL=postgresql+psycopg2://llm_monitor:llm_monitor@localhost:5432/llm_monitor
 ```
 
-## Verification
+## 验证
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8\backend
