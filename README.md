@@ -15,9 +15,20 @@
 - 前端新增模型 Token 环图、日期范围筛选、分页日志、风险 / 漂移标准说明和 24 小时时间显示。
 - 新增 Claude JSONL 历史回填脚本，可把已有记录补齐模型名和 token 信息。
 
+## 模型支持
+
+面板现已完整支持多模型识别与用量统计：
+
+- **模型识别**：自动从 Claude Code JSONL 中读取 `message.model`，识别每次调用的具体模型（如 `claude-opus-4-8`、`claude-sonnet-4-6` 等）
+- **Token 统计**：记录每次调用的 `input_tokens` 和 `output_tokens`，按模型聚合展示
+- **Provider 识别**：自动标记模型来源 Provider
+- **模型用量仪表盘**：前端提供模型 Token 环图（`/models/usage`），直观展示各模型用量占比
+- **日志表模型列**：监控日志表格中显示每条记录的模型名
+- **历史回填**：提供 `backfill_models_from_claude_logs.py` 脚本，可为已有 JSONL 记录补齐模型名和 token 信息
+
 ## 功能特性
 
-- FastAPI 后端，提供 `/ask`、`/ingest`、`/logs`、`/stats`、`/health`、`/metrics` 接口
+- FastAPI 后端，提供 `/ask`、`/ingest`、`/logs`、`/stats`、`/health`、`/metrics`、`/models/usage` 接口
 - WebSocket 实时推送 `/ws/logs`
 - 通过 `prometheus-client` 暴露 Prometheus 指标
 - 默认 SQLite 存储，可通过 `DATABASE_URL` 切换至 PostgreSQL
