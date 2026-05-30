@@ -171,7 +171,7 @@ th { color: #5c5e62; font-size: 12px; text-transform: uppercase; letter-spacing:
 td { color: #334155; max-width: 520px; }
 .model-cell { color: #0f172a; font-weight: 800; white-space: nowrap; }
 .summary-cell { line-height: 1.6; }
-.risk-pill { display: inline-flex; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.risk-pill { display: inline-flex; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .risk-low { background: #f4f4f4; color: #171a20; }
 .risk-medium { background: rgba(245,159,11,.14); color: #92400e; }
 .risk-high { background: rgba(232,33,39,.12); color: #e82127; }
