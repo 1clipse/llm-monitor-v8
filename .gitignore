@@ -3,6 +3,8 @@ frontend/node_modules/
 frontend/dist/
 data/*.db
 data/*.db-*
+data/claude-log-watcher-state.json
+data/*.bad-*
 .env
 __pycache__/
 .pytest_cache/

@@ -4,6 +4,17 @@
 
 工业级本地优先的 LLM 监控面板，基于 FastAPI + React + WebSocket 实时更新 + Prometheus 指标 + SQLite/PostgreSQL 双存储，支持混合模型检测、漂移分析和风险评分。
 
+## v8.1 更新说明
+
+本版本重点强化 Claude Code 后台监控、模型用量识别和大屏可用性：
+
+- `run-dev.ps1` 现在会同时启动后端、前端和 Claude Code JSONL 监听器，减少漏开 watcher 导致的不更新问题。
+- Claude Code 监听器会读取真实 `message.model` 和 token usage，上报到 `/ingest` 后在面板展示模型名、Token、Provider 和来源。
+- 监听器状态文件改为 UTF-8 原子写入；状态损坏时会自动备份并重建，避免实时采集静默失效。
+- 新增模型用量接口 `/models/usage`、分页日志 `/logs`、趋势日志 `/logs/chart` 和 CSV 导出 `/logs/export`。
+- 前端新增模型 Token 环图、日期范围筛选、分页日志、风险 / 漂移标准说明和 24 小时时间显示。
+- 新增 Claude JSONL 历史回填脚本，可把已有记录补齐模型名和 token 信息。
+
 ## 功能特性
 
 - FastAPI 后端，提供 `/ask`、`/ingest`、`/logs`、`/stats`、`/health`、`/metrics` 接口
@@ -20,21 +31,14 @@
 
 本项目设计为你正常使用 Claude Code（通过 cc-switch）时在后台静默运行。
 
-只需在两个 PowerShell 窗口中分别运行：
+只需运行：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8
 .\scripts\run-dev.ps1
 ```
 
-第二个 PowerShell：
-
-```powershell
-cd D:\LLMtext\llm-monitor-v8
-.\scripts\watch-claude-logs.ps1
-```
-
-之后正常使用 Claude Code 即可。打开面板：
+脚本会自动打开三个窗口：FastAPI 后端、Vite 前端和 Claude Code JSONL 监听器。之后正常使用 Claude Code 即可。打开面板：
 
 ```text
 http://localhost:3000
@@ -174,7 +178,7 @@ docker compose up --build
 
 在此 Windows 环境下，推荐使用零成本的 Claude Code JSONL 监控模式。
 
-原理：`cc-switch` 将请求元数据存储在 `C:\Users\Knightz\.cc-switch\cc-switch.db`，但实际的助手回复文本保存在 `C:\Users\Knightz\.claude\projects` 下的 Claude Code 会话日志中。监控器读取这些本地 JSONL 文件，仅将已生成的助手回复 POST 到 `/ingest`。
+原理：`cc-switch` 将请求元数据存储在 `C:\Users\Knightz\.cc-switch\cc-switch.db`，但实际的助手回复文本、模型名和 token usage 保存在 `C:\Users\Knightz\.claude\projects` 下的 Claude Code 会话日志中。监控器读取这些本地 JSONL 文件，仅将已生成的助手回复 POST 到 `/ingest`。
 
 运行顺序：
 
@@ -183,14 +187,14 @@ cd D:\LLMtext\llm-monitor-v8
 .\scripts\run-dev.ps1
 ```
 
-然后打开另一个 PowerShell：
+`run-dev.ps1` 会自动启动 `watch-claude-logs.ps1`。如果你只想单独启动监听器，也可以另开 PowerShell 手动运行：
 
 ```powershell
 cd D:\LLMtext\llm-monitor-v8
 .\scripts\watch-claude-logs.ps1
 ```
 
-之后正常使用 Claude Code / cc-switch 即可。新的助手回复文本将被分析并显示在面板上。
+之后正常使用 Claude Code / cc-switch 即可。新的助手回复文本将被分析并显示在面板上，并统计模型名、Token、Provider 和风险 / 漂移信息。
 
 费用保证：
 
@@ -206,6 +210,38 @@ cd D:\LLMtext\llm-monitor-v8
   -ProjectsDir "C:\Users\Knightz\.claude\projects" `
   -MonitorUrl "http://127.0.0.1:8000/ingest" `
   -PollSeconds 2
+```
+
+状态文件默认写入：
+
+```text
+data/claude-log-watcher-state.json
+```
+
+如果状态文件损坏，监听器会自动备份为 `*.bad-yyyyMMdd-HHmmss` 并从新状态继续运行。首次遇到新 JSONL 文件时会从文件末尾开始监听，避免重放旧会话；如需补齐历史模型名和 token，可运行：
+
+```powershell
+.\backend\.venv\Scripts\python.exe .\scripts\backfill_models_from_claude_logs.py
+```
+
+## 模型用量、筛选与导出
+
+面板现在支持：
+
+- 按模型聚合 Token 和请求次数，显示模型 Token 环图。
+- 按日期范围筛选仪表盘、趋势图、日志表和模型用量。
+- 后台监控记录分页查看。
+- 风险分 / 漂移分标准说明。
+- 导出当前筛选范围内的 CSV：`GET /logs/export`。
+
+相关接口：
+
+```text
+GET /logs?page=1&page_size=20
+GET /logs/chart?limit=10000
+GET /models/usage
+GET /stats
+GET /logs/export
 ```
 
 ## cc-connect 钩子集成

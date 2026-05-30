@@ -1,17 +1,20 @@
+import csv
+import io
+import math
 import time
-from datetime import datetime
+from datetime import datetime, time as datetime_time
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.analyzer import analyze
 from app.auth import require_auth
 from app.client import call_llm, delete_relay_config, list_relay_configs, save_relay_config
-from app.db import get_db, get_recent_logs, save_log
+from app.db import get_db, get_logs_between, get_logs_for_export, get_logs_page, get_model_usage, get_recent_logs, save_log
 from app.metrics import ANALYSIS_LATENCY, ASK_REQUESTS, DRIFT_SCORE, HIGH_RISK_RESPONSES, RISK_SCORE, metrics_response
 from app.models import LogEntry
 from app.notifier import notify_if_configured
-from app.schemas import AskRequest, IngestRequest, LogResponse, RelayConfig, StatsResponse
+from app.schemas import AskRequest, IngestRequest, LogResponse, ModelUsageResponse, PaginatedLogsResponse, RelayConfig, StatsResponse
 from app.websocket import manager
 
 router = APIRouter()
@@ -107,6 +110,54 @@ def _entry_to_response(entry: LogEntry) -> dict:
         "prompt": entry.prompt,
         "text": entry.response_text,
         "analysis": entry.analysis,
+        "model_name": entry.model_name,
+        "provider": entry.provider,
+        "prompt_tokens": entry.prompt_tokens,
+        "completion_tokens": entry.completion_tokens,
+        "total_tokens": entry.total_tokens,
+        "token_source": entry.token_source,
+    }
+
+
+def _day_start(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return datetime.combine(value.date(), datetime_time.min)
+
+
+def _day_end(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return datetime.combine(value.date(), datetime_time.max)
+
+
+def _stats_from_entries(entries: list[LogEntry]) -> dict:
+    total = len(entries)
+    high = sum(1 for item in entries if item.risk_label == "HIGH")
+    high_drift = sum(1 for item in entries if item.drift_score >= 0.65)
+    medium = sum(1 for item in entries if item.risk_label == "MEDIUM")
+    low = sum(1 for item in entries if item.risk_label == "LOW")
+    anomaly = high + medium
+    average_risk = sum(item.risk_score for item in entries) / total if total else 0.0
+    average_drift = sum(item.drift_score for item in entries) / total if total else 0.0
+    latest_drift = entries[0].drift_score if entries else 0.0
+
+    probabilities: dict[str, float] = {}
+    if entries:
+        latest_probs = entries[0].analysis.get("model_probabilities", {})
+        probabilities = {key: float(value) for key, value in latest_probs.items()}
+
+    return {
+        "total": total,
+        "high_risk": high,
+        "high_drift": high_drift,
+        "medium_risk": medium,
+        "low_risk": low,
+        "average_risk_score": round(average_risk, 4),
+        "average_drift_score": round(average_drift, 4),
+        "latest_drift_score": round(latest_drift, 4),
+        "anomaly_ratio": round(anomaly / total, 4) if total else 0.0,
+        "model_probabilities": probabilities,
     }
 
 
@@ -248,36 +299,103 @@ async def cc_connect_hook(payload: dict, db: Session = Depends(get_db)) -> dict:
     )
 
 
-@router.get("/logs", response_model=list[LogResponse])
-def logs(limit: int = 100, db: Session = Depends(get_db), _: dict = Depends(require_auth)) -> list[dict]:
-    limit = min(max(limit, 1), 500)
-    return [_entry_to_response(entry) for entry in get_recent_logs(db, limit)]
+@router.get("/logs", response_model=PaginatedLogsResponse)
+def logs(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_auth),
+) -> dict:
+    entries, total = get_logs_page(db, _day_start(start), _day_end(end), page, page_size)
+    total_pages = math.ceil(total / page_size) if total else 0
+    return {
+        "items": [_entry_to_response(entry) for entry in entries],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_prev": page > 1,
+    }
+
+
+@router.get("/logs/chart", response_model=list[LogResponse])
+def chart_logs(
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+    limit: int = Query(default=2000, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_auth),
+) -> list[dict]:
+    entries = get_logs_between(db, _day_start(start), _day_end(end), limit)
+    return [_entry_to_response(entry) for entry in reversed(entries)]
+
+
+@router.get("/models/usage", response_model=ModelUsageResponse)
+def model_usage(
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_auth),
+) -> dict:
+    items = get_model_usage(db, _day_start(start), _day_end(end))
+    return {
+        "items": items,
+        "total_tokens": sum(item["tokens"] for item in items),
+        "total_requests": sum(item["request_count"] for item in items),
+    }
 
 
 @router.get("/stats", response_model=StatsResponse)
-def stats(db: Session = Depends(get_db), _: dict = Depends(require_auth)) -> dict:
-    entries = get_recent_logs(db, 500)
-    total = len(entries)
-    high = sum(1 for item in entries if item.risk_label == "HIGH")
-    medium = sum(1 for item in entries if item.risk_label == "MEDIUM")
-    low = sum(1 for item in entries if item.risk_label == "LOW")
-    average_risk = sum(item.risk_score for item in entries) / total if total else 0.0
-    latest_drift = entries[0].drift_score if entries else 0.0
+def stats(
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_auth),
+) -> dict:
+    entries = get_logs_between(db, _day_start(start), _day_end(end), None) if start or end else get_logs_between(db, None, None, None)
+    return _stats_from_entries(entries)
 
-    probabilities: dict[str, float] = {}
-    if entries:
-        latest_probs = entries[0].analysis.get("model_probabilities", {})
-        probabilities = {key: float(value) for key, value in latest_probs.items()}
 
-    return {
-        "total": total,
-        "high_risk": high,
-        "medium_risk": medium,
-        "low_risk": low,
-        "average_risk_score": round(average_risk, 4),
-        "latest_drift_score": round(latest_drift, 4),
-        "model_probabilities": probabilities,
-    }
+@router.get("/logs/export")
+def export_logs(
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_auth),
+) -> Response:
+    entries = get_logs_for_export(db, _day_start(start), _day_end(end))
+    output = io.StringIO()
+    output.write("﻿")
+    writer = csv.writer(output)
+    writer.writerow(["ID", "时间", "中转", "模型", "Provider", "Token", "Token 来源", "状态", "风险分", "漂移分", "混模型", "提示词", "回复内容", "原因"])
+    for entry in entries:
+        analysis = entry.analysis or {}
+        writer.writerow([
+            entry.id,
+            entry.created_at.isoformat(sep=" ", timespec="seconds"),
+            entry.relay,
+            entry.model_name or "unknown-model",
+            entry.provider or "",
+            entry.total_tokens or 0,
+            entry.token_source or "estimated",
+            entry.risk_label,
+            round(float(entry.risk_score or 0), 4),
+            round(float(entry.drift_score or 0), 4),
+            "是" if bool(analysis.get("mixed_model", entry.mixed_model)) else "否",
+            entry.prompt,
+            entry.response_text,
+            "; ".join(analysis.get("reasons", [])),
+        ])
+
+    filename = f"llm-monitor-logs-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/metrics")

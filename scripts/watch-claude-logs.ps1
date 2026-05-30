@@ -7,15 +7,57 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function ConvertTo-Hashtable($Value) {
+  if ($null -eq $Value) {
+    return $null
+  }
+
+  if ($Value -is [System.Collections.IDictionary]) {
+    $table = @{}
+    foreach ($key in $Value.Keys) {
+      $table[$key] = ConvertTo-Hashtable $Value[$key]
+    }
+    return $table
+  }
+
+  if ($Value -is [System.Management.Automation.PSCustomObject]) {
+    $table = @{}
+    foreach ($property in $Value.PSObject.Properties) {
+      $table[$property.Name] = ConvertTo-Hashtable $property.Value
+    }
+    return $table
+  }
+
+  if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
+    $items = @()
+    foreach ($item in $Value) {
+      $items += ConvertTo-Hashtable $item
+    }
+    return $items
+  }
+
+  return $Value
+}
+
 function Load-State {
   if (Test-Path $StateFile) {
     try {
-      $raw = Get-Content $StateFile -Raw -Encoding utf8
+      $raw = [System.IO.File]::ReadAllText($StateFile, [System.Text.Encoding]::UTF8)
       if ($raw.Trim()) {
-        return $raw | ConvertFrom-Json -AsHashtable
+        $stateObject = $raw | ConvertFrom-Json
+        $stateTable = ConvertTo-Hashtable $stateObject
+        if ($stateTable -is [hashtable]) {
+          return $stateTable
+        }
       }
     } catch {
-      Write-Warning "State file is unreadable; starting a fresh watcher state. $($_.Exception.Message)"
+      $backup = "$StateFile.bad-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+      try {
+        Copy-Item -Path $StateFile -Destination $backup -Force
+        Write-Warning "State file is unreadable; backed it up to $backup and starting a fresh watcher state. $($_.Exception.Message)"
+      } catch {
+        Write-Warning "State file is unreadable and could not be backed up; starting a fresh watcher state. $($_.Exception.Message)"
+      }
     }
   }
   return @{}
@@ -26,7 +68,11 @@ function Save-State($State) {
   if (-not (Test-Path $dir)) {
     New-Item -ItemType Directory -Force $dir | Out-Null
   }
-  $State | ConvertTo-Json -Depth 8 | Set-Content -Path $StateFile -Encoding utf8
+
+  $json = $State | ConvertTo-Json -Depth 8
+  $tempFile = "$StateFile.tmp"
+  [System.IO.File]::WriteAllText($tempFile, $json, [System.Text.UTF8Encoding]::new($false))
+  Move-Item -Path $tempFile -Destination $StateFile -Force
 }
 
 function Get-TextFromContent($Content) {
@@ -62,6 +108,18 @@ function Get-TextFromContent($Content) {
 
 function Send-ToMonitor($Event, [string]$Text, [string]$FilePath) {
   $sessionId = [System.IO.Path]::GetFileNameWithoutExtension($FilePath)
+  $model = [string]$Event.message.model
+  if (-not $model) { $model = "unknown-claude-code-model" }
+
+  $usage = @{}
+  if ($Event.message.usage) {
+    if ($null -ne $Event.message.usage.input_tokens) { $usage.prompt_tokens = [int]$Event.message.usage.input_tokens }
+    if ($null -ne $Event.message.usage.output_tokens) { $usage.completion_tokens = [int]$Event.message.usage.output_tokens }
+    if ($usage.ContainsKey("prompt_tokens") -or $usage.ContainsKey("completion_tokens")) {
+      $usage.total_tokens = [int]($usage.prompt_tokens + $usage.completion_tokens)
+    }
+  }
+
   $maxTextLength = 190000
   if ($Text.Length -gt $maxTextLength) {
     $Text = $Text.Substring(0, $maxTextLength) + "`n`n[watcher: reply truncated before local analysis]"
@@ -69,11 +127,14 @@ function Send-ToMonitor($Event, [string]$Text, [string]$FilePath) {
 
   $payload = @{
     relay = "cc-switch/claude-code"
-    model = "cc-switch-observed"
+    model = $model
     prompt = ""
     text = $Text
     metadata = @{
       source = "claude-jsonl-watcher"
+      provider = "claude-code"
+      model = $model
+      usage = $usage
       file = $FilePath
       uuid = $Event.uuid
       parent_uuid = $Event.parentUuid
@@ -88,7 +149,7 @@ function Send-ToMonitor($Event, [string]$Text, [string]$FilePath) {
     $result = Invoke-RestMethod -Uri $MonitorUrl -Method Post -ContentType "application/json; charset=utf-8" -Body $bodyBytes -TimeoutSec 8
     $risk = $result.analysis.risk_label
     $score = $result.analysis.risk_score
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] sent assistant reply from $sessionId risk=$risk score=$score"
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] sent assistant reply from $sessionId model=$model risk=$risk score=$score"
   } catch {
     $details = $_.Exception.Message
     if ($_.Exception.Response) {
