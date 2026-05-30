@@ -66,6 +66,7 @@ export default function LogsTable({
           <thead>
             <tr>
               <th>时间</th>
+              <th>Model</th>
               <th>状态</th>
               <th>风险分</th>
               <th>漂移</th>
@@ -76,6 +77,7 @@ export default function LogsTable({
             {logs.map((log) => (
               <tr key={log.id ?? `${log.time}-${log.text}`}>
                 <td>{formatDateTime24(log.time)}</td>
+                <td className="model-cell">{log.model_name || 'unknown-model'}</td>
                 <td><span className={riskClass(log.analysis?.risk_label)}>{riskText[log.analysis?.risk_label] ?? log.analysis?.risk_label}</span></td>
                 <td>{Number(log.analysis?.risk_score ?? 0).toFixed(3)}</td>
                 <td>{Number(log.analysis?.drift_score ?? 0).toFixed(3)}</td>
@@ -84,7 +86,7 @@ export default function LogsTable({
             ))}
             {logs.length === 0 && (
               <tr>
-                <td colSpan="5" className="empty">当前筛选范围暂无监控记录</td>
+                <td colSpan="6" className="empty">当前筛选范围暂无监控记录</td>
               </tr>
             )}
           </tbody>

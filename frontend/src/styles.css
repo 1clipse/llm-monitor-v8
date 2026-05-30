@@ -165,10 +165,11 @@ label { color: #3f4248; display: grid; gap: 8px; font-size: 14px; }
 .export-button { background: #0f766e; white-space: nowrap; }
 .export-button:hover { background: #0d5f59; }
 .table-wrap { overflow: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 820px; background: #fff; }
+table { width: 100%; border-collapse: collapse; min-width: 960px; background: #fff; }
 th, td { text-align: left; padding: 14px 20px; border-bottom: 1px solid rgba(23,26,32,.08); vertical-align: top; }
 th { color: #5c5e62; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; background: #fafafa; }
 td { color: #334155; max-width: 520px; }
+.model-cell { color: #0f172a; font-weight: 800; white-space: nowrap; }
 .summary-cell { line-height: 1.6; }
 .risk-pill { display: inline-flex; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; }
 .risk-low { background: #f4f4f4; color: #171a20; }
