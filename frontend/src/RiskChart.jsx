@@ -2,22 +2,22 @@ import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { formatChartTick24, formatDateTime24, parseServerTime } from './time.js';
 
 const riskStandards = [
-  { label: '正常', range: '< 0.42', detail: '波动较小，未见明显降智信号', tone: 'ok' },
-  { label: '注意', range: '0.42 - 0.72', detail: '风格或漂移偏高，建议观察', tone: 'warn' },
-  { label: '疑似异常', range: '≥ 0.72', detail: '可能混入低质模型或明显降智', tone: 'danger' },
+  { label: '正常', range: '< 0.42', detail: '波动较小，未见明显提醒信号', tone: 'ok' },
+  { label: '需观察', range: '0.42 - 0.72', detail: '风格或漂移偏高，建议继续观察', tone: 'warn' },
+  { label: '建议复核', range: '≥ 0.72', detail: '与当前本地基线差异较大，建议人工复核', tone: 'danger' },
 ];
 
 const driftStandards = [
   { label: '正常', range: '< 0.35', detail: '与近期语义和风格基线接近，漂移稳定', tone: 'ok' },
-  { label: '注意', range: '0.35 - 0.65', detail: '表达风格或语义中心有抬升，建议持续观察', tone: 'warn' },
-  { label: '疑似异常', range: '≥ 0.65', detail: '明显偏离近期基线，可能存在模型或质量波动', tone: 'danger' },
+  { label: '需观察', range: '0.35 - 0.65', detail: '表达风格或语义中心有抬升，建议持续观察', tone: 'warn' },
+  { label: '建议复核', range: '≥ 0.65', detail: '明显偏离当前本地基线，建议人工复核', tone: 'danger' },
 ];
 
 const severityLegend = [
   { label: '正常', range: '0 - 0.35', tone: 'ok' },
-  { label: '注意', range: '0.35 - 0.65', tone: 'warn' },
-  { label: '疑似异常', range: '0.65 - 0.72', tone: 'soft-danger' },
-  { label: '高风险', range: '≥ 0.72', tone: 'danger' },
+  { label: '需观察', range: '0.35 - 0.65', tone: 'warn' },
+  { label: '建议复核', range: '0.65 - 0.72', tone: 'soft-danger' },
+  { label: '重点复核', range: '≥ 0.72', tone: 'danger' },
 ];
 
 function severityColor(value) {
@@ -66,10 +66,10 @@ export function StandardsRow() {
     <section className="standards-row" aria-label="评分标准">
       <StandardPanel
         kicker="RISK STANDARD"
-        title="风险分标准"
+        title="提醒分标准"
         standards={riskStandards}
-        note="风险分由本地漂移、异常检测、混模型概率和文本特征综合计算，不调用任何模型 API。"
-        ariaLabel="风险分标准"
+        note="提醒分由本地漂移、异常检测、低聚类置信度和文本特征综合计算，不调用任何模型 API，也不证明供应商或模型有问题。"
+        ariaLabel="提醒分标准"
       />
       <StandardPanel
         kicker="DRIFT STANDARD"
@@ -106,7 +106,7 @@ export default function RiskChart({ logs, total }) {
           </div>
           <div className="chart-meta">
             <div className="chart-count">已统计 {totalCount} 条，当前展示 {data.length} 个点</div>
-            <div className="severity-legend" aria-label="危险程度颜色说明">
+            <div className="severity-legend" aria-label="提醒级别颜色说明">
               {severityLegend.map((item) => (
                 <span className={`severity-chip ${item.tone}`} key={item.label}>
                   <i aria-hidden="true" />

@@ -326,7 +326,7 @@ export default function Dashboard() {
       <MetricCard label="高漂移对话数" value={stats?.high_drift ?? 0} hint="漂移 ≥ 0.65" />
       <MetricCard label="平均风险分" value={Number(averageRisk).toFixed(3)} hint="0 - 1" />
       <MetricCard label="平均漂移分" value={Number(averageDrift).toFixed(3)} hint="语义 / 风格" />
-      <MetricCard label="异常对话占比" value={`${anomalyRatio.toFixed(1)}%`} hint="注意 + 疑似异常" />
+      <MetricCard label="提醒占比" value={`${anomalyRatio.toFixed(1)}%`} hint="需观察 + 建议复核" />
       <MetricCard label="最新状态" value={latestRisk} hint="当前页最新" />
       <MetricCard label="最新风险分" value={Number(latestScore).toFixed(3)} hint="当前页最新" />
     </section>
@@ -357,7 +357,7 @@ export default function Dashboard() {
     <AppShell activeScreen={activeScreen} onScreenChange={setActiveScreen} status={status} stats={stats} modelUsage={modelUsage}>
       {activeScreen === 'overview' && (
         <>
-          <section className="screen-header"><p className="eyebrow">LLM Monitor v8</p><h1>Claude Code 后台监控</h1><p className="subtitle">正常使用 Claude Code。系统后台读取本地日志，判断是否疑似混模型、漂移或降智。</p></section>
+          <section className="screen-header"><p className="eyebrow">LLM Monitor v8</p><h1>Claude Code 后台监控</h1><p className="subtitle">正常使用 Claude Code。系统后台读取本地日志，给出漂移和复核提醒，不直接证明供应商或模型有问题。</p></section>
           {metrics}
           {toolbar}
           <section className="overview-grid"><RiskChart logs={chartLogs} total={stats?.total ?? chartLogs.length} /><ModelDonutChart usage={modelUsage} compact /></section>

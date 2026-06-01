@@ -2,8 +2,8 @@ import { formatDateTime24 } from './time.js';
 
 const riskText = {
   LOW: '正常',
-  MEDIUM: '注意',
-  HIGH: '疑似异常',
+  MEDIUM: '需观察',
+  HIGH: '建议复核',
 };
 
 function riskClass(label) {

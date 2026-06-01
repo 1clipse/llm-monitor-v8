@@ -131,6 +131,25 @@ def _day_end(value: datetime | None) -> datetime | None:
     return datetime.combine(value.date(), datetime_time.max)
 
 
+def _first_value(*values):
+    for value in values:
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _analysis_context(relay: str, metadata: dict | None = None, raw: dict | None = None) -> dict:
+    metadata = metadata or {}
+    raw = raw or {}
+    return {
+        "relay": relay,
+        "provider": _first_value(metadata.get("provider"), raw.get("provider")),
+        "model": _first_value(metadata.get("model"), raw.get("model"), raw.get("model_name")),
+        "session": _first_value(metadata.get("session"), metadata.get("session_id")),
+        "source": _first_value(metadata.get("monitoring_mode"), raw.get("source")),
+    }
+
+
 def _stats_from_entries(entries: list[LogEntry]) -> dict:
     total = len(entries)
     high = sum(1 for item in entries if item.risk_label == "HIGH")
@@ -170,9 +189,10 @@ async def _analyze_and_store(
     metadata: dict | None = None,
     raw: dict | None = None,
 ) -> dict:
+    analysis_context = _analysis_context(relay, metadata, raw)
     started = time.perf_counter()
     with ANALYSIS_LATENCY.time():
-        analysis = analyze(text)
+        analysis = analyze(text, context=analysis_context)
     elapsed = time.perf_counter() - started
     analysis["analysis_latency_seconds"] = round(elapsed, 6)
 

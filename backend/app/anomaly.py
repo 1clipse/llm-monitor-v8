@@ -3,7 +3,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 
 
-_MIN_SAMPLES = 8
+_MIN_SAMPLES = 20
 
 
 def predict(history_vectors: list[list[float]] | list[np.ndarray], vector: np.ndarray) -> tuple[int, float]:

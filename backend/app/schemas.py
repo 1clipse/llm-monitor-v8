@@ -37,6 +37,11 @@ class AnalysisResult(BaseModel):
     risk_score: float
     risk_label: str
     reasons: list[str]
+    context_key: str | None = None
+    baseline_size: int | None = None
+    baseline_status: str | None = None
+    confidence: float | None = None
+    signals: dict[str, Any] | None = None
 
 
 class LogResponse(BaseModel):

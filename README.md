@@ -4,6 +4,18 @@
 
 工业级本地优先的 LLM 监控面板，基于 FastAPI + React + WebSocket 实时更新 + Prometheus 指标 + SQLite/PostgreSQL 双存储，支持混合模型检测、漂移分析和风险评分。
 
+## v8.2 更新说明
+
+本版本重点优化风控判定流程，降低 DeepSeek / GPT-5.5 等官方 API 正常回复的误报，并让面板文案更符合“本地启发式提醒”的定位：
+
+- 风险分析支持按 `provider:model` / `model` / `relay` 建立独立本地基线，避免不同供应商和模型互相污染历史样本。
+- `/ask`、`/ingest` 和 `cc-connect` 集成会把已有的 relay、provider、model、session 等上下文传入分析器。
+- 新增 `context_key`、`baseline_size`、`baseline_status`、`confidence` 和结构化 `signals`，方便判断当前提醒是否有足够基线支撑。
+- 冷启动和 warming 阶段不再轻易触发统计型高风险；`mixed_model` 只有在基线 ready 且漂移升高时才会触发。
+- 错误关键词判定区分普通说明和 hard failure / stack trace，减少正常技术回答中的误报。
+- 前端将“异常 / 高风险”文案调整为“需观察 / 建议复核”，强调本地监控不能直接证明供应商或模型有问题。
+- 新增 DeepSeek、GPT-5.5、基线隔离和 hard failure 的回归测试。
+
 ## v8.1 更新说明
 
 本版本重点强化 Claude Code 后台监控、模型用量识别和大屏可用性：
